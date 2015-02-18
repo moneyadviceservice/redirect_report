@@ -68,20 +68,22 @@ def load_redirects_from_file redirects_file
 end
 
 
-def count_redirect(log_line)
+def process_line(log_line)
   return if log_line.path == '/' || log_line.source_ip == '10.50.6.148'
 
   matched_redirect = $redirects.keys.find { |r| log_line.path.match(r) }
-  if matched_redirect
-    if log_line.syndication?
-      $redirects[matched_redirect].syndication += 1
-    elsif log_line.google_bot?
-      $redirects[matched_redirect].google += 1
-    elsif log_line.bing_bot?
-      $redirects[matched_redirect].bing += 1
-    else
-      $redirects[matched_redirect].public += 1
-    end
+  count_redirect(log_line, matched_redirect) if matched_redirect
+end
+
+def count_redirect(log_line, matched_redirect)
+  if log_line.syndication?
+    $redirects[matched_redirect].syndication += 1
+  elsif log_line.google_bot?
+    $redirects[matched_redirect].google += 1
+  elsif log_line.bing_bot?
+    $redirects[matched_redirect].bing += 1
+  else
+    $redirects[matched_redirect].public += 1
   end
 end
 
@@ -99,7 +101,7 @@ log_files.each do |log_file|
   end
   file.each_line do |line_text|
     line = LogLine.from_line(line_text)
-    count_redirect(line) if line.redirect?
+    process_line(line) if line.redirect?
   end
 end
 
