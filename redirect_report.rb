@@ -24,6 +24,10 @@ class LogLine
     @source_ip == '66.235.132.38'
   end
 
+  def redirect?
+    (300..308).include?(status)
+  end
+
   class << self
     def from_line(line)
       line_bits = line.split(/\s/)
@@ -95,7 +99,7 @@ log_files.each do |log_file|
   end
   file.each_line do |line_text|
     line = LogLine.from_line(line_text)
-    count_redirect(line) if (300..308).include? line.status
+    count_redirect(line) if line.redirect?
   end
 end
 
