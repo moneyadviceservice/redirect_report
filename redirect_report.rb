@@ -3,10 +3,8 @@
 require 'zlib'
 
 class LogLine
-  attr :source_ip
-  attr :path
-  attr :user_agent
-  attr :status
+  attr_reader :source_ip, :path, :user_agent, :status
+
   def initialize(source_ip, path, user_agent, status)
     @source_ip = source_ip
     @path = path
@@ -55,8 +53,7 @@ end
 
 
 def count_redirect(log_line)
-  return if log_line.path == '/'
-  return if log_line.source_ip == '10.50.6.148'
+  return if log_line.path == '/' || log_line.source_ip == '10.50.6.148'
 
   matched_redirect = $redirects.keys.find { |r| log_line.path.match(r) }
   if matched_redirect
@@ -79,14 +76,14 @@ end
 log_files.each do |log_file|
   if log_file == '-'
     file = STDIN
-  elsif log_file[-3..-1] == '.gz'
+  elsif File.extname(log_file) == '.gz'
     file = Zlib::GzipReader.open(log_file)
   else
     file = File.new(log_file)
   end
   file.each_line do |line_text|
     line = LogLine.from_line(line_text)
-    count_redirect(line) if line.status >= 300 and line.status <= 308
+    count_redirect(line) if (300..308).include? line.status
   end
 end
 
