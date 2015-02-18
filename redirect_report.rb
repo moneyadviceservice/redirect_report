@@ -1,6 +1,9 @@
 #!/usr/bin/env ruby
 
 require 'zlib'
+require 'bundler/setup'
+
+Bundler.require(ENV.fetch('RUBY_ENVIRONMENT', 'development'))
 
 class LogLine
   attr_reader :source_ip, :path, :user_agent, :status
