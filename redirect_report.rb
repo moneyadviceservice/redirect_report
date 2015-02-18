@@ -12,6 +12,18 @@ class LogLine
     @status = status
   end
 
+  def bing_bot?
+    @user_agent.match(/bingbot/)
+  end
+
+  def google_bot?
+    @user_agent.match(/Googlebot/)
+  end
+
+  def syndication?
+    @source_ip == '66.235.132.38'
+  end
+
   class << self
     def from_line(line)
       line_bits = line.split(/\s/)
@@ -57,11 +69,11 @@ def count_redirect(log_line)
 
   matched_redirect = $redirects.keys.find { |r| log_line.path.match(r) }
   if matched_redirect
-    if log_line.source_ip == '66.235.132.38'
+    if log_line.syndication?
       $redirects[matched_redirect].syndication += 1
-    elsif log_line.user_agent.match(/Googlebot/)
+    elsif log_line.google_bot?
       $redirects[matched_redirect].google += 1
-    elsif log_line.user_agent.match(/bingbot/)
+    elsif log_line.bing_bot?
       $redirects[matched_redirect].bing += 1
     else
       $redirects[matched_redirect].public += 1
