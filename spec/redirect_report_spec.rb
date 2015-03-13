@@ -1,4 +1,5 @@
 require 'rspec'
+require 'mail'
 
 $: << '.'
 require 'redirect_report'
@@ -7,6 +8,11 @@ class FakeFS::File
   def self.foreach(name)
     File.readlines(name).each { |line| yield line }
   end
+end
+
+
+Mail.defaults do
+  delivery_method :test
 end
 
 
@@ -19,7 +25,8 @@ RSpec.describe RedirectReport do
         '/etc/nginx/conf.d/test-redirects.map',
         "~*^/article/?$ /en/article;\n"
       )
-      File.write('production.log', log_line)
+      File.open('production.log', 'w') { |logfile| logfile.puts log_line }
+      # File.write('production.log', log_line)
     end
 
     after do
@@ -127,6 +134,44 @@ EOD
         }.to output(<<EOD).to_stdout
 public	syndication	google	bing	path
 0	0	0	0	^/article/?$
+EOD
+      end
+    end
+
+    context 'mailing the report' do
+      include Mail::Matchers
+
+      let :log_line do
+        '5.148.140.228 - - [16/Feb/2015:15:39:36 +0000] "GET /article/ HTTP/1.1" 302 178 "-" "-" 0.000 0.000 [-] [-]'
+      end
+
+      before do
+        RedirectReport.run(['production.log', '-m', 'misha.gorodnitzky@moneyadviceservice.org.uk'])
+      end
+
+      it do
+        should have_sent_email.to('misha.gorodnitzky@moneyadviceservice.org.uk')
+      end
+
+      it do
+        should have_sent_email.from 'development.team@moneyadviceservice.org.uk'
+      end
+
+      it do
+        should have_sent_email.with_subject 'Redirects Report'
+      end
+
+      it 'attaches the report to the email' do
+        RedirectReport.run(['production.log', '-m', 'misha.gorodnitzky@moneyadviceservice.org.uk'])
+        expect(Mail::TestMailer.deliveries[0].multipart?).to be true
+        expect(Mail::TestMailer.deliveries[0].parts[0].filename).to eq "Redirects Report #{Date.today.to_s}.csv"
+      end
+
+      it 'formats the report as a CSV' do
+        RedirectReport.run(['production.log', '-m', 'misha.gorodnitzky@moneyadviceservice.org.uk'])
+        expect(Mail::TestMailer.deliveries[0].parts[0].decoded).to eq <<EOD
+public,syndication,google,bing,path
+1,0,0,0,^/article/?$
 EOD
       end
     end

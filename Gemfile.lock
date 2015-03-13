@@ -4,7 +4,10 @@ GEM
     coderay (1.1.0)
     diff-lcs (1.2.5)
     fakefs (0.6.7)
+    mail (2.6.3)
+      mime-types (>= 1.16, < 3)
     method_source (0.8.2)
+    mime-types (2.4.3)
     pry (0.10.1)
       coderay (~> 1.1.0)
       method_source (~> 0.8.1)
@@ -28,5 +31,6 @@ PLATFORMS
 
 DEPENDENCIES
   fakefs
+  mail
   pry
   rspec
