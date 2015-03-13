@@ -26,7 +26,6 @@ RSpec.describe RedirectReport do
         "~*^/article/?$ /en/article;\n"
       )
       File.open('production.log', 'w') { |logfile| logfile.puts log_line }
-      # File.write('production.log', log_line)
     end
 
     after do
@@ -42,8 +41,8 @@ RSpec.describe RedirectReport do
         expect {
           RedirectReport.run(['production.log'])
         }.to output(<<EOD).to_stdout
-public	syndication	google	bing	path
-1	0	0	0	^/article/?$
+public	google	bing	path
+1	0	0	^/article/?$
 EOD
       end
     end
@@ -57,8 +56,8 @@ EOD
         expect {
           RedirectReport.run(['production.log'])
         }.to output(<<EOD).to_stdout
-public	syndication	google	bing	path
-0	0	0	1	^/article/?$
+public	google	bing	path
+0	0	1	^/article/?$
 EOD
       end
     end
@@ -72,23 +71,8 @@ EOD
         expect {
           RedirectReport.run(['production.log'])
         }.to output(<<EOD).to_stdout
-public	syndication	google	bing	path
-0	0	1	0	^/article/?$
-EOD
-      end
-    end
-
-    context 'when a syndication source ip is matched' do
-      let :log_line do
-        '66.235.132.38 - - [16/Feb/2015:15:39:36 +0000] "GET /article/ HTTP/1.1" 302 178 "-" "-" 0.000 0.000 [-] [-]'
-      end
-
-      it 'outputs the number of matches' do
-        expect {
-          RedirectReport.run(['production.log'])
-        }.to output(<<EOD).to_stdout
-public	syndication	google	bing	path
-0	1	0	0	^/article/?$
+public	google	bing	path
+0	1	0	^/article/?$
 EOD
       end
     end
@@ -102,8 +86,8 @@ EOD
         expect {
           RedirectReport.run(['production.log'])
         }.to output(<<EOD).to_stdout
-public	syndication	google	bing	path
-1	0	0	0	^/article/?$
+public	google	bing	path
+1	0	0	^/article/?$
 EOD
       end
     end
@@ -117,8 +101,8 @@ EOD
         expect {
           RedirectReport.run(['production.log'])
         }.to output(<<EOD).to_stdout
-public	syndication	google	bing	path
-0	0	0	0	^/article/?$
+public	google	bing	path
+0	0	0	^/article/?$
 EOD
       end
     end
@@ -132,8 +116,8 @@ EOD
         expect {
           RedirectReport.run(['production.log'])
         }.to output(<<EOD).to_stdout
-public	syndication	google	bing	path
-0	0	0	0	^/article/?$
+public	google	bing	path
+0	0	0	^/article/?$
 EOD
       end
     end
@@ -170,8 +154,8 @@ EOD
       it 'formats the report as a CSV' do
         RedirectReport.run(['production.log', '-m', 'fake.email@moneyadviceservice.org.uk'])
         expect(Mail::TestMailer.deliveries[0].parts[0].decoded).to eq <<EOD
-public,syndication,google,bing,path
-1,0,0,0,^/article/?$
+public,google,bing,path
+1,0,0,^/article/?$
 EOD
       end
     end

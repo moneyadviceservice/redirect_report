@@ -14,22 +14,20 @@ $config = OpenStruct.new(
 
 
 class Redirect
-  attr :regexp, :public, :syndication, :google, :bing
+  attr :regexp, :public, :google, :bing
 
   def initialize(regexp)
     @regexp = regexp
-    @public = @syndication = @google = @bing = 0
+    @public = @google = @bing = 0
   end
 
   def <=>(other)
-    [self.public, syndication, google, bing] <=>
-      [other.public, other.syndication, other.google, other.bing]
+    [self.public, google, bing] <=>
+      [other.public, other.google, other.bing]
   end
 
   def count_log_line(log_line)
-    if log_line.syndication?
-      @syndication += 1
-    elsif log_line.google_bot?
+    if log_line.google_bot?
       @google += 1
     elsif log_line.bing_bot?
       @bing += 1
@@ -56,10 +54,6 @@ class LogLine
 
   def google_bot?
     @user_agent.match(/Googlebot/)
-  end
-
-  def syndication?
-    @source_ip == '66.235.132.38'
   end
 
   def redirect?
@@ -115,7 +109,9 @@ module RedirectReport
   end
 
   def process_line(log_line)
-    return if log_line.path == '/' || log_line.source_ip == '10.50.6.148'
+    return if log_line.path == '/'
+    return if log_line.source_ip == '10.50.6.148' # Internal test server.
+    return if log_line.source_ip == '66.235.132.38' # Atomz bot source.
 
     matched_redirect = $redirects.keys.find do |pattern|
       log_line.path.match $redirects[pattern].regexp
@@ -158,10 +154,9 @@ module RedirectReport
   end
 
   def format_output(redirects, stream, delimit="\t")
-    stream.puts %w{public syndication google bing path}.join(delimit)
+    stream.puts %w{public google bing path}.join(delimit)
     redirects.each do |redirect|
       stream.puts [redirect.public,
-                   redirect.syndication,
                    redirect.google,
                    redirect.bing,
                    redirect.regexp.source].join(delimit)
