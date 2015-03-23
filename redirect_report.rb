@@ -1,8 +1,10 @@
 #!/usr/bin/env ruby
 
+require 'bundler/setup'
 require 'zlib'
 require 'ostruct'
-require 'bundler/setup'
+require 'mail'
+require 'optparse'
 
 Bundler.require(ENV.fetch('RUBY_ENVIRONMENT', 'development'))
 
@@ -11,10 +13,27 @@ $config = OpenStruct.new(
 )
 
 
-Redirect = Struct.new("Redirect", :public, :syndication, :google, :bing) do
+class Redirect
+  attr :regexp, :public, :google, :bing
+
+  def initialize(regexp)
+    @regexp = regexp
+    @public = @google = @bing = 0
+  end
+
   def <=>(other)
-    [self.public, syndication, google, bing] <=>
-      [other.public, other.syndication, other.google, other.bing]
+    [self.public, google, bing] <=>
+      [other.public, other.google, other.bing]
+  end
+
+  def count_log_line(log_line)
+    if log_line.google_bot?
+      @google += 1
+    elsif log_line.bing_bot?
+      @bing += 1
+    else
+      @public += 1
+    end
   end
 end
 
@@ -35,10 +54,6 @@ class LogLine
 
   def google_bot?
     @user_agent.match(/Googlebot/)
-  end
-
-  def syndication?
-    @source_ip == '66.235.132.38'
   end
 
   def redirect?
@@ -65,38 +80,48 @@ end
 module RedirectReport
   module_function
 
-  def load_redirects_from_file redirects_file
+  def parse_options(args)
+    OptionParser.new do |opts|
+      opts.banner = "Usage: #{File.basename($0)} [options]"
+
+      opts.on("-m", "--mail=ADDRESS", "Mail report to ADDRESS") do |address|
+        $config.mail_to_address = address
+      end
+
+      opts.on_tail("-h", "--help", "Show this message") do
+        puts opts
+        exit
+      end
+    end.parse!(args)
+
+    args
+  end
+
+  def load_redirects_from_file(redirects_file)
     File.foreach(redirects_file) do |line|
       case line
       when /^~(\*)?(\S+)/
-        source_url = Regexp.new($2, $1 ? Regexp::IGNORECASE : 0)
-        $redirects[source_url] = Redirect.new(0, 0, 0, 0)
+        pattern = $2
+        regexp = Regexp.new(pattern, $1 ? Regexp::IGNORECASE : 0)
+        $redirects[pattern] = Redirect.new(regexp)
       end
     end
   end
 
   def process_line(log_line)
-    return if log_line.path == '/' || log_line.source_ip == '10.50.6.148'
+    return if log_line.path == '/'
+    return if log_line.source_ip == '10.50.6.148' # Internal test server.
+    return if log_line.source_ip == '66.235.132.38' # Atomz bot source.
 
-    matched_redirect = $redirects.keys.find { |r| log_line.path.match(r) }
-    count_redirect(log_line, matched_redirect) if matched_redirect
-  end
-
-  def count_redirect(log_line, matched_redirect)
-    if log_line.syndication?
-      $redirects[matched_redirect].syndication += 1
-    elsif log_line.google_bot?
-      $redirects[matched_redirect].google += 1
-    elsif log_line.bing_bot?
-      $redirects[matched_redirect].bing += 1
-    else
-      $redirects[matched_redirect].public += 1
+    matched_redirect = $redirects.keys.find do |pattern|
+      log_line.path.match $redirects[pattern].regexp
     end
+    $redirects[matched_redirect].count_log_line(log_line) if matched_redirect
   end
 
   def run(args)
+    log_files = parse_options args
     redirects_files = Dir[$config.nginx_redirect_files]
-    log_files = args
 
     $redirects = {}
 
@@ -118,19 +143,38 @@ module RedirectReport
       end
     end
 
-    puts %w{public syndication google bing path}.join("\t")
-    $redirects.keys.sort { |a, b| $redirects[b] <=> $redirects[a] }
-      .each do |redirect|
-      puts [$redirects[redirect].public,
-            $redirects[redirect].syndication,
-            $redirects[redirect].google,
-            $redirects[redirect].bing,
-            redirect.source].join("\t")
+    redirects_sorted = $redirects.values.sort
+    if $config.mail_to_address
+      report_file = StringIO.new
+      format_output redirects_sorted, report_file, ','
+      mail_redirects_report $config.mail_to_address, report_file.string
+    else
+      format_output redirects_sorted, $stdout
+    end
+  end
+
+  def format_output(redirects, stream, delimit="\t")
+    stream.puts %w{public google bing path}.join(delimit)
+    redirects.each do |redirect|
+      stream.puts [redirect.public,
+                   redirect.google,
+                   redirect.bing,
+                   redirect.regexp.source].join(delimit)
+    end
+  end
+
+  def mail_redirects_report(to_address, report_contents)
+    Mail.deliver do
+      from 'development.team@moneyadviceservice.org.uk'
+      to to_address
+      subject "Redirects Report"
+      add_file filename: "Redirects Report #{Date.today.to_s}.csv",
+               content: report_contents
     end
   end
 end
 
-if File.basename($0) == __FILE__
+if $0 == __FILE__
   RedirectReport.run(ARGV)
 end
 
