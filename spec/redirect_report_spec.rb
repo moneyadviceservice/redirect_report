@@ -146,11 +146,11 @@ EOD
       end
 
       before do
-        RedirectReport.run(['production.log', '-m', 'misha.gorodnitzky@moneyadviceservice.org.uk'])
+        RedirectReport.run(['production.log', '-m', 'fake.email@moneyadviceservice.org.uk'])
       end
 
       it do
-        should have_sent_email.to('misha.gorodnitzky@moneyadviceservice.org.uk')
+        should have_sent_email.to('fake.email@moneyadviceservice.org.uk')
       end
 
       it do
@@ -162,13 +162,13 @@ EOD
       end
 
       it 'attaches the report to the email' do
-        RedirectReport.run(['production.log', '-m', 'misha.gorodnitzky@moneyadviceservice.org.uk'])
+        RedirectReport.run(['production.log', '-m', 'fake.email@moneyadviceservice.org.uk'])
         expect(Mail::TestMailer.deliveries[0].multipart?).to be true
         expect(Mail::TestMailer.deliveries[0].parts[0].filename).to eq "Redirects Report #{Date.today.to_s}.csv"
       end
 
       it 'formats the report as a CSV' do
-        RedirectReport.run(['production.log', '-m', 'misha.gorodnitzky@moneyadviceservice.org.uk'])
+        RedirectReport.run(['production.log', '-m', 'fake.email@moneyadviceservice.org.uk'])
         expect(Mail::TestMailer.deliveries[0].parts[0].decoded).to eq <<EOD
 public,syndication,google,bing,path
 1,0,0,0,^/article/?$
